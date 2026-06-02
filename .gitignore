@@ -1,4 +1,4 @@
 .env
 venv/
-chroma_db/
 __pycache__/
+# chroma_db is committed so Streamlit Cloud has the vector database
