@@ -1,0 +1,11 @@
+# Light theme on startup (matches the app's default) so there's no dark flash.
+[theme]
+base = "light"
+primaryColor = "#f43737"
+backgroundColor = "#f4efe7"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#201919"
+font = "sans serif"
+
+[browser]
+gatherUsageStats = false
