@@ -122,14 +122,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# Hide Streamlit's default chrome (toolbar / "Manage app" / menu / footer) up front.
+# Hide Streamlit's default chrome up front. Use display:none (not visibility:hidden)
+# so the header reserves no space, otherwise it leaves a large gap at the top.
 st.markdown(
     """
     <style>
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    [data-testid="stToolbar"] {visibility: hidden;}
-    header {visibility: hidden;}
+    #MainMenu {display: none;}
+    footer {display: none;}
+    [data-testid="stToolbar"] {display: none;}
+    [data-testid="stDecoration"] {display: none;}
+    header, [data-testid="stHeader"] {display: none;}
+    /* Collapse the empty wrappers around injected <style> blocks so they
+       don't add vertical gaps at the top of the page. */
+    [data-testid="stElementContainer"]:has(style) {display: none;}
     </style>
     """,
     unsafe_allow_html=True,
@@ -205,7 +210,7 @@ def inject_css(t):
         /* Responsive main column: centered, fluid, room for the fixed bottom bar. */
         .block-container, [data-testid="stMainBlockContainer"] {{
             max-width: min(1700px, 90vw);
-            padding-top: 2rem;
+            padding-top: 1rem;
             padding-left: 1.1rem;
             padding-right: 1.1rem;
             padding-bottom: 220px;
