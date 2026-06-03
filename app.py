@@ -122,6 +122,19 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Hide Streamlit's default chrome (toolbar / "Manage app" / menu / footer) up front.
+st.markdown(
+    """
+    <style>
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    [data-testid="stToolbar"] {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 if "theme" not in st.session_state:
@@ -354,6 +367,29 @@ def inject_css(t):
         }}
         [class*="st-key-sug_"] button:active {{ transform: scale(0.97); }}
 
+        /* ---------- Welcome state: centered pills when chat is empty ---------- */
+        .st-key-welcome {{
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            min-height: calc(100vh - 300px);
+            max-width: 760px; margin: 0 auto;
+            gap: 1.25rem;
+            animation: hahnFadeUp 0.6s var(--easing) both;
+        }}
+        .st-key-welcome [data-testid="stHorizontalBlock"] {{ width: 100%; }}
+        .hahn-welcome-title {{
+            font-size: 1.65rem; font-weight: 700; letter-spacing: -0.02em;
+            color: var(--text); text-align: center; line-height: 1.25;
+        }}
+        .hahn-welcome-sub {{
+            font-size: 0.95rem; color: var(--muted); text-align: center;
+            margin-top: 0.45rem;
+        }}
+        /* Welcome pills sit a touch larger and softer than the inline version. */
+        .st-key-welcome [class*="st-key-sug_"] button {{
+            font-size: 0.92rem; padding: 12px 18px; border-radius: 14px;
+        }}
+
         /* Trash (clear chat) icon button to the left of the ask bar. */
         .st-key-clear button {{
             background: var(--surface);
@@ -542,16 +578,29 @@ for msg in st.session_state.messages:
             render_sources(msg["sources"])
 
 
-# --- Fixed bottom bar: suggestion pills + trash + input form ------------------
+# --- Welcome state: suggestion pills centered in the page when chat is empty --
 clicked_q = None
-with st.container(key="inputbar"):
-    # Suggestion "bubbles" — only before the first question is asked.
-    if not st.session_state.messages:
+if not st.session_state.messages:
+    # Trim the bottom padding (normally reserved for chat) so the welcome
+    # block can truly center in the open space.
+    st.markdown(
+        "<style>.block-container { padding-bottom: 2rem !important; }</style>",
+        unsafe_allow_html=True,
+    )
+    with st.container(key="welcome"):
+        st.markdown(
+            '<div class="hahn-welcome-title">What would you like to know?</div>'
+            '<div class="hahn-welcome-sub">Pick a question to get started, '
+            'or type your own below.</div>',
+            unsafe_allow_html=True,
+        )
         pill_cols = st.columns(len(SUGGESTED))
         for i, q in enumerate(SUGGESTED):
             if pill_cols[i].button(q, key=f"sug_{i}", use_container_width=True):
                 clicked_q = q
 
+# --- Fixed bottom bar: trash + input form ------------------------------------
+with st.container(key="inputbar"):
     with st.container(key="inputrow"):
         trash_col, input_col = st.columns([1, 13])
         with trash_col:
