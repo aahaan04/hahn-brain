@@ -12,6 +12,7 @@ from pathlib import Path
 
 import chromadb
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 from openai import OpenAI
 
@@ -287,6 +288,8 @@ def inject_css(t):
             /* Small margin: Streamlit's vertical block already adds ~18px gap, so
                this keeps the spacing between messages even with the header gap. */
             margin-bottom: 4px;
+            /* When we scroll a question to the top, leave a little breathing room. */
+            scroll-margin-top: 18px;
             animation: hahnFadeUp 0.45s var(--easing) both;
         }}
         [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {{
@@ -548,6 +551,37 @@ with st.container(key="headerbox"):
 # --- Helpers ------------------------------------------------------------------
 TYPING_HTML = '<div class="hahn-typing"><span></span><span></span><span></span></div>'
 
+# Scrolls the most recent user question to the top of the view (like ChatGPT).
+# The scroll container is stMain; we add just enough bottom padding so the
+# question can always reach the top, even when the answer is short.
+SCROLL_TO_QUESTION_JS = """
+<script>
+(function () {
+    const doc = window.parent.document;
+    function go() {
+        const avatars = doc.querySelectorAll('[data-testid="stChatMessageAvatarUser"]');
+        if (!avatars.length) return;
+        const msg = avatars[avatars.length - 1].closest('[data-testid="stChatMessage"]');
+        const main = doc.querySelector('[data-testid="stMain"]');
+        const block = main && main.querySelector('[data-testid="stMainBlockContainer"]');
+        if (!msg || !main || !block) return;
+        // Reset any spacer we added before, so the calculation stays idempotent.
+        block.style.paddingBottom = "";
+        void main.offsetHeight;
+        const basePad = parseFloat(getComputedStyle(block).paddingBottom) || 0;
+        const top = main.scrollTop + (msg.getBoundingClientRect().top - main.getBoundingClientRect().top) - 18;
+        const target = Math.max(0, top);
+        const needed = target + main.clientHeight;
+        if (main.scrollHeight < needed) {
+            block.style.paddingBottom = (basePad + (needed - main.scrollHeight) + 8) + "px";
+        }
+        main.scrollTo({ top: target, behavior: "smooth" });
+    }
+    setTimeout(go, 90);
+})();
+</script>
+"""
+
 
 def retrieve(question):
     q_embed = openai_client.embeddings.create(
@@ -563,9 +597,9 @@ def render_sources(sources):
             st.markdown(f"- {src}")
 
 
-def generate_answer(prompt):
-    """User message is in history and the typing bubble is already shown above.
-    Retrieve context, get the answer, store it, and rerun."""
+def generate_answer(prompt, placeholder):
+    """User message is in history; `placeholder` is the assistant bubble shown
+    above. Stream the answer into it for a smooth typing effect, store it, rerun."""
     # Retrieve on the actual question. For short, vague follow-ups ("tell me more"),
     # also fold in the previous question so context carries over — but never for
     # clear standalone questions, where that would derail the search.
@@ -590,15 +624,22 @@ def generate_answer(prompt):
         "content": f"Context:\n{context}\n\nQuestion: {prompt}",
     })
 
-    completion = openai_client.chat.completions.create(
-        model=CHAT_MODEL, messages=api_messages, temperature=0.2
+    # Stream the response token-by-token so the text appears smoothly.
+    stream = openai_client.chat.completions.create(
+        model=CHAT_MODEL, messages=api_messages, temperature=0.2, stream=True
     )
-    answer = completion.choices[0].message.content
+    answer = ""
+    for chunk in stream:
+        delta = chunk.choices[0].delta.content or ""
+        if delta:
+            answer += delta
+            placeholder.markdown(answer + " ▌")  # blinking-cursor feel
+    placeholder.markdown(answer)
 
     st.session_state.messages.append(
         {"role": "assistant", "content": answer, "sources": sources}
     )
-    st.rerun()  # finalize: re-render full history, hide suggestion pills
+    st.rerun()  # finalize: re-render full history with the sources expander
 
 
 # --- Render chat history ------------------------------------------------------
@@ -608,11 +649,13 @@ for msg in st.session_state.messages:
         if msg["role"] == "assistant" and msg.get("sources"):
             render_sources(msg["sources"])
 
-# While an answer is pending, show the typing bubble right here in the chat flow
-# (directly under the question) so the spacing matches the rest of the messages.
+# While an answer is pending, render its bubble right here in the chat flow
+# (directly under the question). The answer streams into this placeholder.
+answer_placeholder = None
 if st.session_state.get("pending_answer"):
     with st.chat_message("assistant"):
-        st.markdown(TYPING_HTML, unsafe_allow_html=True)
+        answer_placeholder = st.empty()
+        answer_placeholder.markdown(TYPING_HTML, unsafe_allow_html=True)
 
 
 # --- Welcome state: ALWAYS rendered with stable keys so Streamlit never
@@ -663,16 +706,19 @@ with st.container(key="inputbar"):
                 with send_col:
                     sent = st.form_submit_button(":material/send:", use_container_width=True)
 
-# --- Generate the answer for a just-asked question ----------------------------
-# Runs after the input bar is rendered (so it stays visible during generation)
-# and only once the user message is already in history, so the welcome state is
-# already gone — the question and typing indicator appear with no overlap.
+# --- Stream the answer, then (on the final run) scroll the question to the top -
 if st.session_state.get("pending_answer"):
-    generate_answer(st.session_state.pop("pending_answer"))
+    generate_answer(st.session_state.pop("pending_answer"), answer_placeholder)
+elif st.session_state.get("do_scroll"):
+    # Streaming is done and the layout has settled: snap the question to the top
+    # once (a single scroll avoids the animation/measurement conflict).
+    components.html(SCROLL_TO_QUESTION_JS, height=0)
+    st.session_state.do_scroll = False
 
 # --- Dispatch: capture a new question, show it instantly, then rerun ----------
 prompt = clicked_q or (typed.strip() if sent and typed and typed.strip() else None)
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.pending_answer = prompt
+    st.session_state.do_scroll = True
     st.rerun()
