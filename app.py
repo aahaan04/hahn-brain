@@ -284,7 +284,9 @@ def inject_css(t):
             border: 1px solid var(--hairline);
             border-radius: 14px;
             padding: 8px 20px;
-            margin-bottom: 16px;
+            /* Small margin: Streamlit's vertical block already adds ~18px gap, so
+               this keeps the spacing between messages even with the header gap. */
+            margin-bottom: 4px;
             animation: hahnFadeUp 0.45s var(--easing) both;
         }}
         [data-testid="stChatMessage"]:has([data-testid="stChatMessageAvatarUser"]) {{
