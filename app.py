@@ -564,7 +564,8 @@ def render_sources(sources):
 
 
 def generate_answer(prompt):
-    """The user's message is already in history. Show typing, store answer, rerun."""
+    """User message is in history and the typing bubble is already shown above.
+    Retrieve context, get the answer, store it, and rerun."""
     # Retrieve on the actual question. For short, vague follow-ups ("tell me more"),
     # also fold in the previous question so context carries over — but never for
     # clear standalone questions, where that would derail the search.
@@ -589,13 +590,10 @@ def generate_answer(prompt):
         "content": f"Context:\n{context}\n\nQuestion: {prompt}",
     })
 
-    with st.chat_message("assistant"):
-        placeholder = st.empty()
-        placeholder.markdown(TYPING_HTML, unsafe_allow_html=True)  # 3-dot typing indicator
-        completion = openai_client.chat.completions.create(
-            model=CHAT_MODEL, messages=api_messages, temperature=0.2
-        )
-        answer = completion.choices[0].message.content
+    completion = openai_client.chat.completions.create(
+        model=CHAT_MODEL, messages=api_messages, temperature=0.2
+    )
+    answer = completion.choices[0].message.content
 
     st.session_state.messages.append(
         {"role": "assistant", "content": answer, "sources": sources}
@@ -609,6 +607,12 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if msg["role"] == "assistant" and msg.get("sources"):
             render_sources(msg["sources"])
+
+# While an answer is pending, show the typing bubble right here in the chat flow
+# (directly under the question) so the spacing matches the rest of the messages.
+if st.session_state.get("pending_answer"):
+    with st.chat_message("assistant"):
+        st.markdown(TYPING_HTML, unsafe_allow_html=True)
 
 
 # --- Welcome state: ALWAYS rendered with stable keys so Streamlit never
