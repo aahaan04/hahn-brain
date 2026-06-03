@@ -55,6 +55,7 @@ SYSTEM_PROMPT = (
 THEMES = {
     "dark": {
         "bg": "#0f242c",
+        "bg_rgb": "15, 36, 44",
         "surface": "#17323c",
         "user_bg": "#14303a",
         "asst_bg": "#1b3a45",
@@ -74,6 +75,7 @@ THEMES = {
     },
     "light": {
         "bg": "#f4efe7",
+        "bg_rgb": "244, 239, 231",
         "surface": "#ffffff",
         "user_bg": "#fbf3ee",
         "asst_bg": "#ffffff",
@@ -157,6 +159,7 @@ def inject_css(t):
 
         :root {{
             --bg: {t['bg']};
+            --bg-rgb: {t['bg_rgb']};
             --surface: {t['surface']};
             --user-bg: {t['user_bg']};
             --asst-bg: {t['asst_bg']};
@@ -335,17 +338,21 @@ def inject_css(t):
 
         /* ---------- Fixed bottom bar: suggestion pills + trash + input ---------- */
         .st-key-inputbar {{
-            position: fixed; left: 0; right: 0; bottom: 12px; margin: 0 auto;
+            position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto;
             width: min(1700px, 90vw); z-index: 999;
-            background: var(--bg);
-            padding-top: 10px;
+            padding-top: 12px; padding-bottom: 16px;
             animation: hahnFadeIn 0.5s var(--easing) both;
         }}
-        /* Soft fade so messages scroll out cleanly behind the bar. */
+        /* Full-width solid backdrop that fades in at the top and runs to the very
+           bottom of the page, so chat text (and any pills mid-transition) never
+           show under or behind the input bar. */
         .st-key-inputbar::before {{
-            content: ""; position: absolute; left: 0; right: 0; top: -28px; height: 28px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0), var(--bg));
-            pointer-events: none;
+            content: ""; position: fixed; left: 0; right: 0; bottom: 0;
+            height: 160px; z-index: -1; pointer-events: none;
+            background: linear-gradient(to bottom,
+                rgba(var(--bg-rgb), 0) 0%,
+                rgb(var(--bg-rgb)) 34%,
+                rgb(var(--bg-rgb)) 100%);
         }}
         .st-key-inputbar [data-testid="stHorizontalBlock"] {{ align-items: center; }}
         /* Keep trash + input + send on one line even on mobile (pills still stack). */
