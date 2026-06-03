@@ -327,9 +327,21 @@ def inject_css(t):
             border: 1px solid var(--hairline) !important;
             border-radius: 12px; overflow: hidden;
         }}
+        /* Force every part of the expander (header + body, in all states) to the
+           themed surface so the header never flashes white in dark mode. */
+        [data-testid="stExpander"] details,
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] details > div,
+        [data-testid="stExpander"] [data-testid="stExpanderDetails"] {{
+            background: var(--surface) !important;
+        }}
         [data-testid="stExpander"] summary {{ color: var(--muted) !important; font-size: 0.82rem; }}
-        [data-testid="stExpander"] summary:hover {{ color: var(--accent-hover) !important; }}
-        [data-testid="stExpander"] details > div {{ background: var(--surface) !important; }}
+        [data-testid="stExpander"] summary:hover,
+        [data-testid="stExpander"] summary:focus,
+        [data-testid="stExpander"] summary:focus-visible {{
+            background: var(--surface) !important;
+            color: var(--accent-hover) !important;
+        }}
         /* Wrap long source URLs so they never get cut off (esp. on phones). */
         [data-testid="stExpander"] [data-testid="stMarkdownContainer"],
         [data-testid="stExpander"] [data-testid="stMarkdownContainer"] a {{
