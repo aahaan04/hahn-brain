@@ -9,3 +9,11 @@ font = "sans serif"
 
 [browser]
 gatherUsageStats = false
+
+[server]
+headless = true
+
+[client]
+# Removes the top-right toolbar / hamburger menu for a clean, app-like look.
+toolbarMode = "minimal"
+showErrorDetails = false
