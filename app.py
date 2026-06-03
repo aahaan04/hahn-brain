@@ -530,13 +530,8 @@ def render_sources(sources):
             st.markdown(f"- {src}")
 
 
-def answer_question(prompt):
-    """Append the user's question, show a typing indicator, store the answer, rerun."""
-    st.session_state.messages.append({"role": "user", "content": prompt})
-
-    with st.chat_message("user"):
-        st.markdown(prompt)
-
+def generate_answer(prompt):
+    """The user's message is already in history. Show typing, store answer, rerun."""
     # Retrieve on the actual question. For short, vague follow-ups ("tell me more"),
     # also fold in the previous question so context carries over — but never for
     # clear standalone questions, where that would derail the search.
@@ -624,7 +619,16 @@ with st.container(key="inputbar"):
                 with send_col:
                     sent = st.form_submit_button(":material/send:", use_container_width=True)
 
-# --- Dispatch -----------------------------------------------------------------
+# --- Generate the answer for a just-asked question ----------------------------
+# Runs after the input bar is rendered (so it stays visible during generation)
+# and only once the user message is already in history, so the welcome state is
+# already gone — the question and typing indicator appear with no overlap.
+if st.session_state.get("pending_answer"):
+    generate_answer(st.session_state.pop("pending_answer"))
+
+# --- Dispatch: capture a new question, show it instantly, then rerun ----------
 prompt = clicked_q or (typed.strip() if sent and typed and typed.strip() else None)
 if prompt:
-    answer_question(prompt)
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.session_state.pending_answer = prompt
+    st.rerun()
