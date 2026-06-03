@@ -337,23 +337,21 @@ def inject_css(t):
         }}
 
         /* ---------- Fixed bottom bar: suggestion pills + trash + input ---------- */
+        /* The input bar is a full-width, opaque backdrop at the bottom (z-index
+           above all chat content). It fades in at the top and is solid to the
+           bottom edge, so chat text and any pills mid-transition can never show
+           under or behind it. */
         .st-key-inputbar {{
-            position: fixed; left: 0; right: 0; bottom: 0; margin: 0 auto;
-            width: min(1700px, 90vw); z-index: 999;
-            padding-top: 12px; padding-bottom: 16px;
-            animation: hahnFadeIn 0.5s var(--easing) both;
-        }}
-        /* Full-width solid backdrop that fades in at the top and runs to the very
-           bottom of the page, so chat text (and any pills mid-transition) never
-           show under or behind the input bar. */
-        .st-key-inputbar::before {{
-            content: ""; position: fixed; left: 0; right: 0; bottom: 0;
-            height: 160px; z-index: -1; pointer-events: none;
+            position: fixed; left: 0; right: 0; bottom: 0; width: 100%; z-index: 999;
+            padding-top: 52px; padding-bottom: 16px;
             background: linear-gradient(to bottom,
                 rgba(var(--bg-rgb), 0) 0%,
-                rgb(var(--bg-rgb)) 34%,
+                rgb(var(--bg-rgb)) 38%,
                 rgb(var(--bg-rgb)) 100%);
+            animation: hahnFadeIn 0.5s var(--easing) both;
         }}
+        /* Keep the actual controls centered within the full-width bar. */
+        .st-key-inputrow {{ max-width: min(1700px, 90vw); margin: 0 auto; }}
         .st-key-inputbar [data-testid="stHorizontalBlock"] {{ align-items: center; }}
         /* Keep trash + input + send on one line even on mobile (pills still stack). */
         .st-key-inputrow [data-testid="stHorizontalBlock"] {{
@@ -380,10 +378,12 @@ def inject_css(t):
         [class*="st-key-sug_"] button:active {{ transform: scale(0.97); }}
 
         /* ---------- Welcome state: centered pills when chat is empty ---------- */
+        /* 100dvh (dynamic viewport height) keeps mobile browser chrome from
+           pushing the last pill behind the input bar. */
         .st-key-welcome {{
             display: flex; flex-direction: column;
             align-items: center; justify-content: center;
-            min-height: calc(100vh - 300px);
+            min-height: calc(100dvh - 300px);
             max-width: 760px; margin: 0 auto;
             gap: 1.25rem;
             animation: hahnFadeUp 0.6s var(--easing) both;
@@ -481,6 +481,18 @@ def inject_css(t):
                 height: 54px !important; min-width: 0 !important;
             }}
             .st-key-inputbar input {{ height: 54px; }}
+
+            /* A little more breathing room under the phone's address bar. */
+            .block-container, [data-testid="stMainBlockContainer"] {{ padding-top: 1.6rem; }}
+            /* Shorter fade so the bar covers less of the welcome pills. */
+            .st-key-inputbar {{ padding-top: 30px; }}
+            /* Reserve more space for the taller mobile bar so the last pill
+               sits clear of it (no blur / cut-off), and nudge the welcome up. */
+            .st-key-welcome {{
+                min-height: calc(100dvh - 380px);
+                justify-content: flex-start;
+                padding-top: 0.5rem; padding-bottom: 1.5rem;
+            }}
         }}
 
         @media (prefers-reduced-motion: reduce) {{
@@ -585,26 +597,33 @@ for msg in st.session_state.messages:
             render_sources(msg["sources"])
 
 
-# --- Welcome state: suggestion pills centered in the page when chat is empty --
-clicked_q = None
-if not st.session_state.messages:
-    # Trim the bottom padding (normally reserved for chat) so the welcome
-    # block can truly center in the open space.
+# --- Welcome state: ALWAYS rendered with stable keys so Streamlit never
+# mounts/unmounts it (which caused the pills to "ghost" under the input bar on
+# rerun). Once the chat has started it is simply hidden with CSS. -------------
+if st.session_state.messages:
+    st.markdown(
+        "<style>.st-key-welcome { display: none !important; }</style>",
+        unsafe_allow_html=True,
+    )
+else:
+    # Empty chat: trim the bottom padding so the welcome can center.
     st.markdown(
         "<style>.block-container { padding-bottom: 2rem !important; }</style>",
         unsafe_allow_html=True,
     )
-    with st.container(key="welcome"):
-        st.markdown(
-            '<div class="hahn-welcome-title">What would you like to know?</div>'
-            '<div class="hahn-welcome-sub">Pick a question to get started, '
-            'or type your own below.</div>',
-            unsafe_allow_html=True,
-        )
-        pill_cols = st.columns(len(SUGGESTED))
-        for i, q in enumerate(SUGGESTED):
-            if pill_cols[i].button(q, key=f"sug_{i}", use_container_width=True):
-                clicked_q = q
+
+clicked_q = None
+with st.container(key="welcome"):
+    st.markdown(
+        '<div class="hahn-welcome-title">What would you like to know?</div>'
+        '<div class="hahn-welcome-sub">Pick a question to get started, '
+        'or type your own below.</div>',
+        unsafe_allow_html=True,
+    )
+    pill_cols = st.columns(len(SUGGESTED))
+    for i, q in enumerate(SUGGESTED):
+        if pill_cols[i].button(q, key=f"sug_{i}", use_container_width=True):
+            clicked_q = q
 
 # --- Fixed bottom bar: trash + input form ------------------------------------
 with st.container(key="inputbar"):
