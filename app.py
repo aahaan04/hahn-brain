@@ -299,12 +299,15 @@ def inject_css(t):
             height: 52px; display: flex; align-items: center; box-sizing: border-box;
             padding: 0;
         }}
-        /* The accent line is solid for most of its height, then softly fades
-           out near the bottom so it ends gently instead of with a hard cut. */
+        /* The accent line is solid for most of its height, then fades its own
+           opacity to 0 near the bottom (transparent red, not red-to-bg) so it
+           blends cleanly into whatever is behind it. */
         .hahn-sticky-inner::before {{
             content: ""; width: 4px; align-self: stretch;
             background: linear-gradient(to bottom,
-                var(--accent) 0%, var(--accent) 68%, rgba(var(--bg-rgb), 0) 100%);
+                rgba(244, 55, 55, 1) 0%,
+                rgba(244, 55, 55, 1) 55%,
+                rgba(244, 55, 55, 0) 100%);
             border-radius: 2px;
             margin-right: 16px;
         }}
