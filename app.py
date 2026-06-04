@@ -273,6 +273,25 @@ def inject_css(t):
         .hahn-header .hahn-logo-img {{
             height: var(--logo-height); width: auto; max-width: 100%; display: block;
         }}
+
+        /* ---------- Thin sticky header (slides in on scroll) ---------- */
+        .hahn-sticky-header {{
+            position: fixed; top: 0; left: 0; right: 0; z-index: 60;
+            background: rgba(var(--bg-rgb), 0.92);
+            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--hairline);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14);
+            transform: translateY(-110%);
+            transition: transform 0.38s var(--easing);
+            will-change: transform;
+        }}
+        .hahn-sticky-header.visible {{ transform: translateY(0); }}
+        .hahn-sticky-inner {{
+            max-width: min(1700px, 90vw); margin: 0 auto;
+            height: 52px; display: flex; align-items: center;
+            border-left: 4px solid var(--accent); padding-left: 16px;
+        }}
+        .hahn-sticky-logo {{ height: 1.7rem; width: auto; display: block; }}
         .hahn-header .hahn-logo {{ flex: 0 0 auto; line-height: 1; }}
         .hahn-header p {{
             margin: 9px 0 0 0; font-weight: 400; color: var(--muted);
@@ -547,6 +566,45 @@ with st.container(key="headerbox"):
         st.session_state.theme = "light" if st.session_state.theme == "dark" else "dark"
         st.rerun()
 
+# Thin sticky header (just the logo) that slides in when the full header box is
+# scrolled out of view, and slides back out at the top. Toggled by JS below.
+if logo_uri:
+    st.markdown(
+        f"""
+        <div class="hahn-sticky-header" id="hahnStickyHeader">
+            <div class="hahn-sticky-inner">
+                <img src="{logo_uri}" class="hahn-sticky-logo" alt="Hahn" />
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# JS: show the sticky header once the user scrolls past the full header box.
+components.html(
+    """
+    <script>
+    (function () {
+        const doc = window.parent.document;
+        const main = doc.querySelector('[data-testid="stMain"]');
+        if (!main) return;
+        function update() {
+            const sticky = doc.getElementById('hahnStickyHeader');
+            if (!sticky) return;
+            if (main.scrollTop > 140) sticky.classList.add('visible');
+            else sticky.classList.remove('visible');
+        }
+        if (!main.__hahnStickyBound) {
+            main.__hahnStickyBound = true;
+            main.addEventListener('scroll', update, { passive: true });
+        }
+        update();
+    })();
+    </script>
+    """,
+    height=0,
+)
+
 
 # --- Helpers ------------------------------------------------------------------
 TYPING_HTML = '<div class="hahn-typing"><span></span><span></span><span></span></div>'
@@ -569,7 +627,9 @@ SCROLL_TO_QUESTION_JS = """
         block.style.paddingBottom = "";
         void main.offsetHeight;
         const basePad = parseFloat(getComputedStyle(block).paddingBottom) || 0;
-        const top = main.scrollTop + (msg.getBoundingClientRect().top - main.getBoundingClientRect().top) - 18;
+        // Offset leaves room for the thin sticky header (52px) so the question
+        // lands just below it rather than under it.
+        const top = main.scrollTop + (msg.getBoundingClientRect().top - main.getBoundingClientRect().top) - 64;
         const target = Math.max(0, top);
         const needed = target + main.clientHeight;
         if (main.scrollHeight < needed) {
@@ -706,13 +766,15 @@ with st.container(key="inputbar"):
                 with send_col:
                     sent = st.form_submit_button(":material/send:", use_container_width=True)
 
-# --- Stream the answer, then (on the final run) scroll the question to the top -
+# --- Scroll the question to the top the moment it's sent ----------------------
+# Injected on the streaming run (so it happens on send, before the answer is
+# done) and again on the settled run (the rerun would otherwise reset scroll).
+if st.session_state.get("do_scroll"):
+    components.html(SCROLL_TO_QUESTION_JS, height=0)
+
 if st.session_state.get("pending_answer"):
     generate_answer(st.session_state.pop("pending_answer"), answer_placeholder)
-elif st.session_state.get("do_scroll"):
-    # Streaming is done and the layout has settled: snap the question to the top
-    # once (a single scroll avoids the animation/measurement conflict).
-    components.html(SCROLL_TO_QUESTION_JS, height=0)
+else:
     st.session_state.do_scroll = False
 
 # --- Dispatch: capture a new question, show it instantly, then rerun ----------
