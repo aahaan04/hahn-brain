@@ -288,6 +288,18 @@ def inject_css(t):
         .hahn-sticky-header.visible {{
             transform: translateY(0); opacity: 1;
         }}
+        /* Soft gradient that bridges the red sticky stripe and the bot card's
+           accent stripe below, so the two left lines blend smoothly instead of
+           meeting abruptly. Positioned just under the bar, scoped to the line. */
+        .hahn-sticky-header::after {{
+            content: ""; position: absolute;
+            top: 100%; height: 16px; width: 4px;
+            left: var(--sticky-line-x, 54px);
+            background: linear-gradient(to bottom, var(--accent), var(--asst-accent));
+            opacity: 0; transition: opacity 0.3s ease;
+            pointer-events: none;
+        }}
+        .hahn-sticky-header.visible::after {{ opacity: 1; }}
         /* Width / left position are set in JS so they exactly match the main
            block-container, putting the left border on the same x-coordinate
            as the header card and message cards. */
@@ -605,8 +617,9 @@ components.html(
         if (!main) return;
         function alignSticky() {
             const inner = doc.querySelector('.hahn-sticky-inner');
+            const sticky = doc.getElementById('hahnStickyHeader');
             const hdr = doc.querySelector('.hahn-header');
-            if (!inner || !hdr) return;
+            if (!inner || !hdr || !sticky) return;
             // Position the inner exactly over the header card so the left
             // border lines up with the chat content below it.
             const r = hdr.getBoundingClientRect();
@@ -616,6 +629,8 @@ components.html(
             inner.style.paddingLeft = '0px';
             inner.style.paddingRight = '0px';
             inner.style.margin = '0';
+            // Sync the fade-bridge x-position with the line's actual left edge.
+            sticky.style.setProperty('--sticky-line-x', (r.left + window.scrollX) + 'px');
         }
         function update() {
             const sticky = doc.getElementById('hahnStickyHeader');
