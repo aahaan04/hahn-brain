@@ -256,7 +256,7 @@ def inject_css(t):
         .hahn-header {{
             background: {t['header_grad']};
             border: 1px solid var(--hairline);
-            border-left: 4px solid var(--accent);
+            border-left: 4px solid var(--asst-accent);
             border-radius: 16px;
             padding: var(--header-pad) clamp(20px, 4vw, 32px);
             margin: 0 0 22px 0;
@@ -277,19 +277,22 @@ def inject_css(t):
         /* ---------- Thin sticky header (slides in on scroll) ---------- */
         .hahn-sticky-header {{
             position: fixed; top: 0; left: 0; right: 0; z-index: 60;
-            background: rgba(var(--bg-rgb), 0.92);
-            backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+            background: rgba(var(--bg-rgb), 0.90);
+            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
             border-bottom: 1px solid var(--hairline);
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.14);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.16);
             transform: translateY(-110%);
-            transition: transform 0.38s var(--easing);
-            will-change: transform;
+            transition: transform 0.36s var(--easing), opacity 0.3s ease;
+            opacity: 0; will-change: transform;
         }}
-        .hahn-sticky-header.visible {{ transform: translateY(0); }}
+        .hahn-sticky-header.visible {{
+            transform: translateY(0); opacity: 1;
+        }}
         .hahn-sticky-inner {{
             max-width: min(1700px, 90vw); margin: 0 auto;
             height: 52px; display: flex; align-items: center;
-            border-left: 4px solid var(--accent); padding-left: 16px;
+            /* Matches the bot-message accent so all three left lines align. */
+            border-left: 4px solid var(--asst-accent); padding-left: 16px;
         }}
         .hahn-sticky-logo {{ height: 1.7rem; width: auto; display: block; }}
         .hahn-header .hahn-logo {{ flex: 0 0 auto; line-height: 1; }}
@@ -581,6 +584,7 @@ if logo_uri:
     )
 
 # JS: show the sticky header once the user scrolls past the full header box.
+# Triggers precisely when the header card bottom clears the viewport top.
 components.html(
     """
     <script>
@@ -590,14 +594,19 @@ components.html(
         if (!main) return;
         function update() {
             const sticky = doc.getElementById('hahnStickyHeader');
-            if (!sticky) return;
-            if (main.scrollTop > 140) sticky.classList.add('visible');
+            const hdr = doc.querySelector('.hahn-header');
+            if (!sticky || !hdr) return;
+            const hdrBottom = hdr.getBoundingClientRect().bottom;
+            const mainTop = main.getBoundingClientRect().top;
+            if (hdrBottom < mainTop + 8) sticky.classList.add('visible');
             else sticky.classList.remove('visible');
         }
-        if (!main.__hahnStickyBound) {
-            main.__hahnStickyBound = true;
-            main.addEventListener('scroll', update, { passive: true });
+        // Re-bind on every rerun so the listener is always fresh.
+        if (main.__hahnStickyHandler) {
+            main.removeEventListener('scroll', main.__hahnStickyHandler);
         }
+        main.__hahnStickyHandler = update;
+        main.addEventListener('scroll', update, { passive: true });
         update();
     })();
     </script>
@@ -766,21 +775,15 @@ with st.container(key="inputbar"):
                 with send_col:
                     sent = st.form_submit_button(":material/send:", use_container_width=True)
 
-# --- Scroll the question to the top the moment it's sent ----------------------
-# Injected on the streaming run (so it happens on send, before the answer is
-# done) and again on the settled run (the rerun would otherwise reset scroll).
-if st.session_state.get("do_scroll"):
-    components.html(SCROLL_TO_QUESTION_JS, height=0)
-
+# --- Scroll to the question on the run where it first appears (before the
+# answer, so the user sees the question snap to the top immediately on send).
 if st.session_state.get("pending_answer"):
+    components.html(SCROLL_TO_QUESTION_JS, height=0)
     generate_answer(st.session_state.pop("pending_answer"), answer_placeholder)
-else:
-    st.session_state.do_scroll = False
 
 # --- Dispatch: capture a new question, show it instantly, then rerun ----------
 prompt = clicked_q or (typed.strip() if sent and typed and typed.strip() else None)
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     st.session_state.pending_answer = prompt
-    st.session_state.do_scroll = True
     st.rerun()
