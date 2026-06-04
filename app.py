@@ -256,7 +256,7 @@ def inject_css(t):
         .hahn-header {{
             background: {t['header_grad']};
             border: 1px solid var(--hairline);
-            border-left: 4px solid var(--asst-accent);
+            border-left: 4px solid var(--accent);
             border-radius: 16px;
             padding: var(--header-pad) clamp(20px, 4vw, 32px);
             margin: 0 0 22px 0;
@@ -288,11 +288,22 @@ def inject_css(t):
         .hahn-sticky-header.visible {{
             transform: translateY(0); opacity: 1;
         }}
+        /* Width / left position are set in JS so they exactly match the main
+           block-container, putting the left border on the same x-coordinate
+           as the header card and message cards. */
+        .hahn-sticky-header {{
+            min-height: 52px;
+        }}
         .hahn-sticky-inner {{
-            max-width: min(1700px, 90vw); margin: 0 auto;
-            height: 52px; display: flex; align-items: center;
-            /* Matches the bot-message accent so all three left lines align. */
-            border-left: 4px solid var(--asst-accent); padding-left: 16px;
+            top: 0;
+            height: 52px; display: flex; align-items: center; box-sizing: border-box;
+            padding: 0;
+        }}
+        .hahn-sticky-inner::before {{
+            content: ""; width: 4px; align-self: stretch;
+            background: var(--accent);
+            border-radius: 2px;
+            margin-right: 16px;
         }}
         .hahn-sticky-logo {{ height: 1.7rem; width: auto; display: block; }}
         .hahn-header .hahn-logo {{ flex: 0 0 auto; line-height: 1; }}
@@ -592,10 +603,25 @@ components.html(
         const doc = window.parent.document;
         const main = doc.querySelector('[data-testid="stMain"]');
         if (!main) return;
+        function alignSticky() {
+            const inner = doc.querySelector('.hahn-sticky-inner');
+            const hdr = doc.querySelector('.hahn-header');
+            if (!inner || !hdr) return;
+            // Position the inner exactly over the header card so the left
+            // border lines up with the chat content below it.
+            const r = hdr.getBoundingClientRect();
+            inner.style.position = 'absolute';
+            inner.style.left = (r.left + window.scrollX) + 'px';
+            inner.style.width = r.width + 'px';
+            inner.style.paddingLeft = '0px';
+            inner.style.paddingRight = '0px';
+            inner.style.margin = '0';
+        }
         function update() {
             const sticky = doc.getElementById('hahnStickyHeader');
             const hdr = doc.querySelector('.hahn-header');
             if (!sticky || !hdr) return;
+            alignSticky();
             const hdrBottom = hdr.getBoundingClientRect().bottom;
             const mainTop = main.getBoundingClientRect().top;
             if (hdrBottom < mainTop + 8) sticky.classList.add('visible');
@@ -607,6 +633,7 @@ components.html(
         }
         main.__hahnStickyHandler = update;
         main.addEventListener('scroll', update, { passive: true });
+        window.parent.addEventListener('resize', update, { passive: true });
         update();
     })();
     </script>
