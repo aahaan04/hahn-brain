@@ -288,18 +288,6 @@ def inject_css(t):
         .hahn-sticky-header.visible {{
             transform: translateY(0); opacity: 1;
         }}
-        /* Soft gradient that bridges the red sticky stripe and the bot card's
-           accent stripe below, so the two left lines blend smoothly instead of
-           meeting abruptly. Positioned just under the bar, scoped to the line. */
-        .hahn-sticky-header::after {{
-            content: ""; position: absolute;
-            top: 100%; height: 16px; width: 4px;
-            left: var(--sticky-line-x, 54px);
-            background: linear-gradient(to bottom, var(--accent), var(--asst-accent));
-            opacity: 0; transition: opacity 0.3s ease;
-            pointer-events: none;
-        }}
-        .hahn-sticky-header.visible::after {{ opacity: 1; }}
         /* Width / left position are set in JS so they exactly match the main
            block-container, putting the left border on the same x-coordinate
            as the header card and message cards. */
@@ -311,9 +299,12 @@ def inject_css(t):
             height: 52px; display: flex; align-items: center; box-sizing: border-box;
             padding: 0;
         }}
+        /* The accent line is solid for most of its height, then softly fades
+           out near the bottom so it ends gently instead of with a hard cut. */
         .hahn-sticky-inner::before {{
             content: ""; width: 4px; align-self: stretch;
-            background: var(--accent);
+            background: linear-gradient(to bottom,
+                var(--accent) 0%, var(--accent) 68%, rgba(var(--bg-rgb), 0) 100%);
             border-radius: 2px;
             margin-right: 16px;
         }}
@@ -629,8 +620,6 @@ components.html(
             inner.style.paddingLeft = '0px';
             inner.style.paddingRight = '0px';
             inner.style.margin = '0';
-            // Sync the fade-bridge x-position with the line's actual left edge.
-            sticky.style.setProperty('--sticky-line-x', (r.left + window.scrollX) + 'px');
         }
         function update() {
             const sticky = doc.getElementById('hahnStickyHeader');
